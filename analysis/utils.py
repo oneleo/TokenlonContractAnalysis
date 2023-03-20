@@ -9,7 +9,7 @@ from pycoingecko import CoinGeckoAPI
 from dotenv import load_dotenv
 
 # 副程式：取得 Tokenlon Subgraph 的 Query
-def get_graphql_query(gte_timestamp):
+def get_tokenlon_graphql_query(gte_timestamp):
     return f"""{{
   swappeds(
     orderBy: timestamp
@@ -60,10 +60,10 @@ def get_tokenlon_data():
     GRAPH_URL = os.getenv("GRAPH_URL")
     # 計算 90 天前的 timestamp
     days_90_timestamp = int((datetime.now() - timedelta(days=90)).timestamp())
-    query = get_graphql_query(days_90_timestamp)
+    query = get_tokenlon_graphql_query(days_90_timestamp)
     # 建立 GraphQL query 的請求
     r = requests.post(GRAPH_URL, json={'query': query})
-    print('Note: Use The Graph API')
+    print('Note: Use The Tokenlon Graph API')
     # 從回傳的結果中提取出需要的資料
     query_data = json.loads(r.text)['data']
     # 取出 swappeds，重新命名，並增加一個 method 欄位，均存放 amm 字串值
@@ -91,6 +91,39 @@ def add_nearest_price_column(coingecko_price, subgraph_price):
         return nearest_price
     subgraph_price['CoingeckoPrice'] = subgraph_price['Timestamp'].apply(find_nearest_price)
     return subgraph_price
+
+# 副程式：取得 Tokenlon Subgraph 的 Query
+def get_uniswap3_graphql_query(gte_timestamp):
+    return f"""{{
+  tokenHourDatas(
+    orderBy: periodStartUnix
+    where: {{token_: {{symbol: "WETH"}}, periodStartUnix_gte: {gte_timestamp}}}
+    orderDirection: desc
+  ) {{
+    id
+    periodStartUnix
+    open
+    high
+    low
+    close
+  }}
+}}"""
+
+def get_uniswap3_data():
+    # 計算 90 天前的 timestamp
+    days_90_timestamp = int((datetime.now() - timedelta(days=90)).timestamp())
+    query = get_uniswap3_graphql_query(days_90_timestamp)
+    # 建立 GraphQL query 的請求
+    r = requests.post("https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3", json={'query': query})
+    print('Note: Use The Uniswap V3 Graph API')
+    # 從回傳的結果中提取出需要的資料
+    query_data = json.loads(r.text)['data']
+    tokenHourDatas = pd.json_normalize(query_data)
+    # 取出 tokenHourDatas，重新命名，並增加一個 method 欄位，均存放 amm 字串值
+    tokenHourDatas = pd.DataFrame(query_data['tokenHourDatas'], columns=["id", "periodStartUnix", "open", "high", "low", "close"])
+    tokenHourDatas['id'] = tokenHourDatas['id'].str.split('-').str[0]
+    tokenHourDatas = tokenHourDatas.rename(columns={"id": "Id", "periodStartUnix": "Timestamp", "open": "Open", "high": "High", "low": "Low", "close": "Close"})
+    return tokenHourDatas.sort_values(by="Timestamp", ascending=True)
 
 # 副程式：取出 Price 資料後，將 Price 資料倒數
 def reciprocal(data):

@@ -38,22 +38,43 @@ for coin, csv_file_path in coin_csv_file_path.items():
 #           Tokenlon Subgraph          #
 ########################################
 
-subgraph_file_path = './data/tokenlon_subgraph.csv'
+tokenlon_subgraph_file_path = './data/tokenlon_subgraph.csv'
 
 # 如果 CSV 檔案不存在，則從 Tokenlon Subgraph 取得資料後存入 csv
-if not utils.check_csv_file(subgraph_file_path):
+if not utils.check_csv_file(tokenlon_subgraph_file_path):
     subgraph_data = utils.get_tokenlon_data()
-    subgraph_data.to_csv(subgraph_file_path, index=False)
+    subgraph_data.to_csv(tokenlon_subgraph_file_path, index=False)
 
 # 從 CSV 中取得最後的 Timestamp（不含毫秒），並計算與 now 的時間差
-last_timestamp = utils.get_last_time(subgraph_file_path)
+last_timestamp = utils.get_last_time(tokenlon_subgraph_file_path)
 time_diff = datetime.now() - datetime.fromtimestamp(last_timestamp)
 
 # 如果超過 1 小時，表示 CSV 檔太舊，需將 CSV 檔更新
 if time_diff.total_seconds() > 3600:
     # 從 Tokenlon Subgraph 取得資料
     subgraph_data = utils.get_tokenlon_data()
-    utils.update_csv(subgraph_file_path, subgraph_data)
+    utils.update_csv(tokenlon_subgraph_file_path, subgraph_data)
+
+########################################
+#          Uniswap V3 Subgraph         #
+########################################
+
+uniswap3_subgraph_file_path = './data/uniswap3_subgraph.csv'
+
+# 如果 CSV 檔案不存在，則從 Uniswap V3 Subgraph 取得資料後存入 csv
+if not utils.check_csv_file(uniswap3_subgraph_file_path):
+    subgraph_data = utils.get_uniswap3_data()
+    subgraph_data.to_csv(uniswap3_subgraph_file_path, index=False)
+
+# 從 CSV 中取得最後的 Timestamp（不含毫秒），並計算與 now 的時間差
+last_timestamp = utils.get_last_time(uniswap3_subgraph_file_path)
+time_diff = datetime.now() - datetime.fromtimestamp(last_timestamp)
+
+# 如果超過 1 小時，表示 CSV 檔太舊，需將 CSV 檔更新
+if time_diff.total_seconds() > 3600:
+    # 從 Uniswap V3 Subgraph 取得資料
+    subgraph_data = utils.get_uniswap3_data()
+    utils.update_csv(uniswap3_subgraph_file_path, subgraph_data)
 
 ########################################
 #                 Plot                 #
@@ -84,7 +105,7 @@ coin_decimals = {
 }
 
 # 從 Tokenlon Subgraph CSV 取出 subgraph 資料（Timestamp 到秒）
-subgraph_data_csv = pd.read_csv(subgraph_file_path, parse_dates=False)
+subgraph_data_csv = pd.read_csv(tokenlon_subgraph_file_path, parse_dates=False)
 # 將 MakerToken 和 TakerToken 資料全換成小寫，以利後續取出所需的資料
 subgraph_data_csv = subgraph_data_csv.assign(MakerToken=subgraph_data_csv['MakerToken'].str.lower(), TakerToken=subgraph_data_csv['TakerToken'].str.lower())
 
