@@ -9,9 +9,11 @@ from pycoingecko import CoinGeckoAPI
 from dotenv import load_dotenv
 
 # 副程式：取得 Tokenlon Subgraph 的 Query
-def get_tokenlon_graphql_query(gte_timestamp):
+def get_tokenlon_graphql_query(gte_timestamp, skip):
     return f"""{{
   swappeds(
+    first: 1000
+    skip: {skip}
     orderBy: timestamp
     orderDirection: desc
     where: {{timestamp_gte: {gte_timestamp}}}
@@ -25,6 +27,8 @@ def get_tokenlon_graphql_query(gte_timestamp):
     takerAssetAmount
   }}
   fillOrders(
+    first: 1000
+    skip: {skip}
     orderBy: timestamp
     orderDirection: desc
     where: {{timestamp_gte: {gte_timestamp}}}
@@ -38,6 +42,8 @@ def get_tokenlon_graphql_query(gte_timestamp):
     takerAssetAmount
   }}
   limitOrders(
+    first: 1000
+    skip: {skip}
     orderBy: blockTimestamp
     orderDirection: desc
     where: {{blockTimestamp_gte: "{gte_timestamp}"}}
@@ -54,13 +60,13 @@ def get_tokenlon_graphql_query(gte_timestamp):
 }}"""
 
 # 副程式：從 The Graph 中取出
-def get_tokenlon_data():
+def get_tokenlon_data(skip):
     # 從 .env 檔案取得 GRAPH_URL 參數
     load_dotenv()
     GRAPH_URL = os.getenv("GRAPH_URL")
     # 計算 90 天前的 timestamp
     days_90_timestamp = int((datetime.now() - timedelta(days=90)).timestamp())
-    query = get_tokenlon_graphql_query(days_90_timestamp)
+    query = get_tokenlon_graphql_query(days_90_timestamp, skip)
     # 建立 GraphQL query 的請求
     r = requests.post(GRAPH_URL, json={'query': query})
     print('Note: Use The Tokenlon Graph API')
@@ -93,9 +99,11 @@ def add_nearest_price_column(coingecko_price, subgraph_price):
     return subgraph_price
 
 # 副程式：取得 Tokenlon Subgraph 的 Query
-def get_uniswap3_graphql_query(gte_timestamp):
+def get_uniswap3_graphql_query(gte_timestamp, skip):
     return f"""{{
   tokenHourDatas(
+    first: 1000
+    skip: {skip}
     orderBy: periodStartUnix
     where: {{token_: {{symbol: "WETH"}}, periodStartUnix_gte: {gte_timestamp}}}
     orderDirection: desc
@@ -109,20 +117,24 @@ def get_uniswap3_graphql_query(gte_timestamp):
   }}
 }}"""
 
-def get_uniswap3_data():
+def get_uniswap3_data(skip):
     # 計算 90 天前的 timestamp
     days_90_timestamp = int((datetime.now() - timedelta(days=90)).timestamp())
-    query = get_uniswap3_graphql_query(days_90_timestamp)
+    query = get_uniswap3_graphql_query(days_90_timestamp, skip)
     # 建立 GraphQL query 的請求
     r = requests.post("https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3", json={'query': query})
     print('Note: Use The Uniswap V3 Graph API')
     # 從回傳的結果中提取出需要的資料
     query_data = json.loads(r.text)['data']
     tokenHourDatas = pd.json_normalize(query_data)
-    # 取出 tokenHourDatas，重新命名，並增加一個 method 欄位，均存放 amm 字串值
+    # 取出 tokenHourDatas
     tokenHourDatas = pd.DataFrame(query_data['tokenHourDatas'], columns=["id", "periodStartUnix", "open", "high", "low", "close"])
+    # 取出 id 的「-」前面的值，即為 Token Address 值
     tokenHourDatas['id'] = tokenHourDatas['id'].str.split('-').str[0]
+    # 將 Header 重新命名
     tokenHourDatas = tokenHourDatas.rename(columns={"id": "Id", "periodStartUnix": "Timestamp", "open": "Open", "high": "High", "low": "Low", "close": "Close"})
+    # 增加一個從 Close 複製來的 Price 值
+    tokenHourDatas = tokenHourDatas.assign(Price=tokenHourDatas['Close'])
     return tokenHourDatas.sort_values(by="Timestamp", ascending=True)
 
 # 副程式：取出 Price 資料後，將 Price 資料倒數
@@ -193,9 +205,10 @@ def plotMove2(name, coingecko_data, sell_coin_data, buy_coin_data):
     ax.set_title(name)
     ax.set_xlabel('Timestamp')
     ax.set_ylabel('Price (USD)')
-    ax.plot(coingecko_timestamps, coingecko_prices, color='green', label='Coingecko Price')
-    ax.plot(sell_timestamps, sell_prices, color='red', label='Sell Price')
     ax.plot(buy_timestamps, buy_prices, color='blue', label='Buy Price')
+    ax.plot(sell_timestamps, sell_prices, color='red', label='Sell Price')
+    ax.plot(coingecko_timestamps, coingecko_prices, color='green', label='Coingecko Price')
+    # ax.plot(coingecko_timestamps, coingecko_prices, color='green', label='Uniswap V3 Price')
     ax.legend()
     def on_move(event):
         # 判斷滑鼠事件發生在 ax 這個子圖上
@@ -223,10 +236,12 @@ def plotMove2(name, coingecko_data, sell_coin_data, buy_coin_data):
             timestamp_value = timestamps[index]
             # 將 Timestamp 轉成人類看得懂的型式
             time = datetime.fromtimestamp(timestamp_value).strftime('%Y-%m-%d %H:%M:%S')
+            # time = timestamp_value
             price_value = prices[index]
             coingeckoPrice_value = coingeckoPrices[index]
             # 更新圖表標題顯示 Price 和 Timestamp 值
             ax.set_title(f'{name} Time: {time}\n{line_name}: Price={price_value:.6f}, CoingeckoPrices={coingeckoPrice_value:.6f}')
+            # ax.set_title(f'{name} Time: {time}\n{line_name}: Price={price_value:.6f}, Uniswap3Prices={coingeckoPrice_value:.6f}')
             fig.canvas.draw()
     # 綁定事件處理器
     fig.canvas.mpl_connect('motion_notify_event', on_move)

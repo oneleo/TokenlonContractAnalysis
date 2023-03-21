@@ -42,8 +42,22 @@ tokenlon_subgraph_file_path = './data/tokenlon_subgraph.csv'
 
 # 如果 CSV 檔案不存在，則從 Tokenlon Subgraph 取得資料後存入 csv
 if not utils.check_csv_file(tokenlon_subgraph_file_path):
-    subgraph_data = utils.get_tokenlon_data()
-    subgraph_data.to_csv(tokenlon_subgraph_file_path, index=False)
+    # 因為 The Graph 一次最多只能取前 1000 筆資料
+    # 所以設定 skip = 0 ~ 5000 的值，並將執行 6 次的結果寫入 CSV 中
+    for i in range(5000,-1,-1000):
+        subgraph_data = utils.get_tokenlon_data(i)
+        if utils.check_csv_file(tokenlon_subgraph_file_path):
+            # 如第二次之後寫入 CSV，就不需要將像是 Id, Timestamp 等 Header 資料寫入 CSV
+            subgraph_data.to_csv(tokenlon_subgraph_file_path, mode='a', header=False, index=False)
+        else:
+            # 如果第一次寫入 CSV，則需要有像是 Id, Timestamp 等 Header 資料
+            subgraph_data.to_csv(tokenlon_subgraph_file_path, index=False)
+
+    # 因為 The Graph 的讀取是拆成 6 次執行，將 CSV 檔整個重新以 Timestamp 作排序
+    # 否則中間 Timestamp 若不連續，會導致畫出來的圖不會正確
+    tokenlon_subgraph_data_csv = pd.read_csv(tokenlon_subgraph_file_path, parse_dates=False)
+    tokenlon_subgraph_data_csv = tokenlon_subgraph_data_csv.sort_values(by="Timestamp", ascending=True)
+    tokenlon_subgraph_data_csv.to_csv(tokenlon_subgraph_file_path, index=False)
 
 # 從 CSV 中取得最後的 Timestamp（不含毫秒），並計算與 now 的時間差
 last_timestamp = utils.get_last_time(tokenlon_subgraph_file_path)
@@ -52,7 +66,7 @@ time_diff = datetime.now() - datetime.fromtimestamp(last_timestamp)
 # 如果超過 1 小時，表示 CSV 檔太舊，需將 CSV 檔更新
 if time_diff.total_seconds() > 3600:
     # 從 Tokenlon Subgraph 取得資料
-    subgraph_data = utils.get_tokenlon_data()
+    subgraph_data = utils.get_tokenlon_data(0) # skip = 0
     utils.update_csv(tokenlon_subgraph_file_path, subgraph_data)
 
 ########################################
@@ -61,10 +75,29 @@ if time_diff.total_seconds() > 3600:
 
 uniswap3_subgraph_file_path = './data/uniswap3_subgraph.csv'
 
-# 如果 CSV 檔案不存在，則從 Uniswap V3 Subgraph 取得資料後存入 csv
+# # 如果 CSV 檔案不存在，則從 Uniswap V3 Subgraph 取得資料後存入 csv
+# if not utils.check_csv_file(uniswap3_subgraph_file_path):
+#     subgraph_data = utils.get_uniswap3_data()
+#     subgraph_data.to_csv(uniswap3_subgraph_file_path, index=False)
+
+# 如果 CSV 檔案不存在，則從 Tokenlon Subgraph 取得資料後存入 csv
 if not utils.check_csv_file(uniswap3_subgraph_file_path):
-    subgraph_data = utils.get_uniswap3_data()
-    subgraph_data.to_csv(uniswap3_subgraph_file_path, index=False)
+    # 因為 The Graph 一次最多只能取前 1000 筆資料
+    # 所以設定 skip = 0 ~ 5000 的值，並將執行 6 次的結果寫入 CSV 中
+    for i in range(5000,-1,-1000):
+        subgraph_data = utils.get_uniswap3_data(i)
+        if utils.check_csv_file(uniswap3_subgraph_file_path):
+            # 如第二次之後寫入 CSV，就不需要將像是 Id, Timestamp 等 Header 資料寫入 CSV
+            subgraph_data.to_csv(uniswap3_subgraph_file_path, mode='a', header=False, index=False)
+        else:
+            # 如果第一次寫入 CSV，則需要有像是 Id, Timestamp 等 Header 資料
+            subgraph_data.to_csv(uniswap3_subgraph_file_path, index=False)
+
+    # 因為 The Graph 的讀取是拆成 6 次執行，將 CSV 檔整個重新以 Timestamp 作排序
+    # 否則中間 Timestamp 若不連續，會導致畫出來的圖不會正確
+    uniswap3_subgraph_data_csv = pd.read_csv(uniswap3_subgraph_file_path, parse_dates=False)
+    uniswap3_subgraph_data_csv = uniswap3_subgraph_data_csv.sort_values(by="Timestamp", ascending=True)
+    uniswap3_subgraph_data_csv.to_csv(uniswap3_subgraph_file_path, index=False)
 
 # 從 CSV 中取得最後的 Timestamp（不含毫秒），並計算與 now 的時間差
 last_timestamp = utils.get_last_time(uniswap3_subgraph_file_path)
@@ -73,7 +106,7 @@ time_diff = datetime.now() - datetime.fromtimestamp(last_timestamp)
 # 如果超過 1 小時，表示 CSV 檔太舊，需將 CSV 檔更新
 if time_diff.total_seconds() > 3600:
     # 從 Uniswap V3 Subgraph 取得資料
-    subgraph_data = utils.get_uniswap3_data()
+    subgraph_data = utils.get_uniswap3_data(0) # skip = 0
     utils.update_csv(uniswap3_subgraph_file_path, subgraph_data)
 
 ########################################
@@ -108,6 +141,9 @@ coin_decimals = {
 subgraph_data_csv = pd.read_csv(tokenlon_subgraph_file_path, parse_dates=False)
 # 將 MakerToken 和 TakerToken 資料全換成小寫，以利後續取出所需的資料
 subgraph_data_csv = subgraph_data_csv.assign(MakerToken=subgraph_data_csv['MakerToken'].str.lower(), TakerToken=subgraph_data_csv['TakerToken'].str.lower())
+
+# 從 Uniswap V3 Subgraph CSV 取出 subgraph 資料
+uniswap3_subgraph_data_csv = pd.read_csv(uniswap3_subgraph_file_path, parse_dates=False)
 
 # 從 CoinGecko CSV 取出 ETH-USD 資料（Timestamp 到毫秒）
 eth_data_csv = pd.read_csv(coin_csv_file_path['ethereum'], parse_dates=False)
@@ -196,7 +232,7 @@ if coin == 'ethereum' and target == 'tether':
     buy_eth = utils.add_nearest_price_column(eth_data_csv, buy_eth)
     # 繪製
     utils.plotMove2(f'{coin}-{target}', eth_data_csv, sell_eth, buy_eth)
-
+    # utils.plotMove2(f'{coin}-{target}', uniswap3_subgraph_data_csv, sell_eth, buy_eth)
 
 # subgraph_data_eth_usdt.to_csv('./test/subgraph_data_eth_usdt.csv', index=False)
 
