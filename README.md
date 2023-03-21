@@ -20,7 +20,18 @@ export PATH="$PATH:/Users/irara/Library/Python/3.9/bin"
 ## 安裝執行程式碼所需套件
 
 ```shell
-% pip3 install pycoingecko matplotlib pandas python-dotenv
+% pip3 install pycoingecko matplotlib pandas python-dotenv web3
+```
+
+## 依自身申請的 KEY 來修改 .env 檔
+
+```
+% cp .env.example .env
+
+### 編輯 .env 檔
+GRAPH_URL = "https://gateway.thegraph.com/api/[api-key]/subgraphs/id/SHnGLtUhEcxGk9xiLxbHHTRBrLJ44utGv2BVi3yc42S"
+ETHEREUM_NODE_URL = "https://eth-mainnet.alchemyapi.io/v2/YOUR_ETHEREUM_NODE_URL_KEY"
+###
 ```
 
 ## 執行程式碼
@@ -33,7 +44,7 @@ export PATH="$PATH:/Users/irara/Library/Python/3.9/bin"
 ```
 % git clone git@github.com:oneleo/TokenlonContractAnalysis.git
 % cd TokenlonContractAnalysis
-% python3 ./analysis/index.py
+% python3 ./analysis/index_price.py
 ```
 
 ## 執行結果
