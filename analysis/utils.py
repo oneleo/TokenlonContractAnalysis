@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import numpy as np
 import os
 import requests
@@ -197,6 +198,7 @@ def plotMove2(name, coingecko_data, sell_coin_data, buy_coin_data):
     min_timestamp = min(min(sell_coin_data['Timestamp']), min(buy_coin_data['Timestamp']))
     last_index = (coingecko_data['Timestamp'] >= min_timestamp).idxmax() - 1
     coingecko_data = coingecko_data.iloc[last_index:]
+    print(coingecko_data)
     # 將資料轉成繪圖可以使用的格式
     coingecko_timestamps, coingecko_prices = zip(*zip(coingecko_data['Timestamp'], coingecko_data['Price']))
     sell_timestamps, sell_prices, sell_coingeckoPrices = zip(*zip(sell_coin_data['Timestamp'], sell_coin_data['Price'], sell_coin_data['CoingeckoPrice']))
@@ -250,8 +252,103 @@ def plotMove2(name, coingecko_data, sell_coin_data, buy_coin_data):
     buy_price_min, buy_price_max = filtered_prices_max(buy_prices)
     coingeckoPrices_min, coingeckoPrices_max = filtered_prices_max(coingecko_prices)
     plt.ylim(min(sell_price_min, buy_price_min, coingeckoPrices_min), max(sell_price_max, buy_price_max, coingeckoPrices_max))
+    # 計算 1 天前的 timestamp
+    days_timestamp = int((datetime.now() - timedelta(days=0.5)).timestamp())
+    # 將 X 軸顯示範圍為 sell 或 buy 的 timestamp 顯示範圍
+    # plt.xlim(min(min(sell_timestamps),min(buy_timestamps)), max(sell_timestamps))
+    plt.xlim(days_timestamp, max(sell_timestamps))
+    # 繪圖
+    plt.show()
+
+# 繪製圖形，並透過滑鼠位置更新圖片上的 Price 資訊
+def plotMove3(name, coingecko_data, sell_coin_data, buy_coin_data):
+    # 限制圖表顯示範圍
+    # date_start = "2023/03/10 00:00:00+0800"
+    # date_end = "2023/03/17 00:00:00+0800"
+    # date_start = "2023/03/15 00:00:00+0800"
+    # date_end = "2023/03/18 00:00:00+0800"
+    date_start = "2023/03/20 00:00:00+0800"
+    date_end = "2023/03/23 00:00:00+0800"
+    # 設置時間刻度
+    locator = mdates.HourLocator(interval=6)  # 每小时一个刻度
+    formatter = mdates.DateFormatter('%m/%d %H:%M')  # 以小时和分钟的形式显示时间
+    # locator = mdates.DayLocator(interval=1)  # 每天一个刻度
+    # formatter = mdates.DateFormatter('%m/%d')  # 以月和日的形式显示时间    
+    # 将字符串转换为datetime对象，以及将datetime对象转换为Unix时间戳
+    timestamp_start = int(datetime.strptime(date_start, "%Y/%m/%d %H:%M:%S%z").timestamp())
+    timestamp_end = int(datetime.strptime(date_end, "%Y/%m/%d %H:%M:%S%z").timestamp())
+    # 以 date_start 及 date_end 篩選資料來源
+    coingecko_data = coingecko_data[(coingecko_data['Timestamp'] >= timestamp_start) & (coingecko_data['Timestamp'] <= timestamp_end)]
+    sell_coin_data = sell_coin_data[(sell_coin_data['Timestamp'] >= timestamp_start) & (sell_coin_data['Timestamp'] <= timestamp_end)]
+    buy_coin_data = buy_coin_data[(buy_coin_data['Timestamp'] >= timestamp_start) & (buy_coin_data['Timestamp'] <= timestamp_end)]
+    # 將資料轉成繪圖可以使用的格式
+    coingecko_timestamps, coingecko_prices = zip(*zip(coingecko_data['Timestamp'], coingecko_data['Price']))
+    sell_timestamps, sell_prices, sell_coingeckoPrices = zip(*zip(sell_coin_data['Timestamp'], sell_coin_data['Price'], sell_coin_data['CoingeckoPrice']))
+    buy_timestamps, buy_prices, buy_coingeckoPrices = zip(*zip(buy_coin_data['Timestamp'], buy_coin_data['Price'], buy_coin_data['CoingeckoPrice']))
+    # 重新格式化时间戳
+    coingecko_timestamps = [datetime.fromtimestamp(ts) for ts in coingecko_data['Timestamp']]
+    sell_timestamps = [datetime.fromtimestamp(ts) for ts in sell_coin_data['Timestamp']]
+    buy_timestamps = [datetime.fromtimestamp(ts) for ts in buy_coin_data['Timestamp']]
+    # 建立繪圖物件
+    fig, ax = plt.subplots()
+    # 設定子圖之間的間距，可以通過調整 bottom 參數增加底部的空白
+    fig.subplots_adjust(bottom=0.2)
+    # 设置时间刻度
+    ax.xaxis.set_major_locator(locator)
+    ax.xaxis.set_major_formatter(formatter)
+    ax.set_title(name)
+    ax.set_xlabel('Timestamp')
+    ax.set_ylabel('Price (USD)')
+    ax.plot(buy_timestamps, buy_prices, color='blue', label='Buy Price')
+    ax.plot(sell_timestamps, sell_prices, color='red', label='Sell Price')
+    ax.plot(coingecko_timestamps, coingecko_prices, color='green', label='Coingecko Price')
+    # ax.plot(coingecko_timestamps, coingecko_prices, color='green', label='Uniswap V3 Price')
+    ax.legend()
+    def on_move(event):
+        # 判斷滑鼠事件發生在 ax 這個子圖上
+        if event.inaxes == ax:
+            # 取得滑鼠位置
+            x, y = event.xdata, event.ydata        
+            # 計算距離每條線的距離
+            sell_distance = abs(y - np.interp(x, sell_timestamps, sell_prices))
+            buy_distance = abs(y - np.interp(x, buy_timestamps, buy_prices))
+            # 取得最近的線
+            min_distance = min(sell_distance, buy_distance)
+            # 判斷最近的線是 buy 線還是 sell 線
+            if min_distance == sell_distance:
+                timestamps = sell_timestamps
+                prices = sell_prices
+                coingeckoPrices = sell_coingeckoPrices
+                line_name = 'Sell'
+            else:
+                timestamps = buy_timestamps
+                prices = buy_prices
+                coingeckoPrices = buy_coingeckoPrices
+                line_name = 'Buy'
+            # 取得最近的點的索引值和座標值
+            index = np.argmin(np.abs(timestamps - x))
+            timestamp_value = timestamps[index]
+            # 將 Timestamp 轉成人類看得懂的型式
+            time = datetime.fromtimestamp(timestamp_value).strftime('%Y-%m-%d %H:%M:%S')
+            # time = timestamp_value
+            price_value = prices[index]
+            coingeckoPrice_value = coingeckoPrices[index]
+            # 更新圖表標題顯示 Price 和 Timestamp 值
+            ax.set_title(f'{name} Time: {time}\n{line_name}: Price={price_value:.6f}, CoingeckoPrices={coingeckoPrice_value:.6f}')
+            # ax.set_title(f'{name} Time: {time}\n{line_name}: Price={price_value:.6f}, Uniswap3Prices={coingeckoPrice_value:.6f}')
+            fig.canvas.draw()
+    # 綁定事件處理器
+    fig.canvas.mpl_connect('motion_notify_event', on_move)
+    # 將 Y 軸的顯示範圍為 prices 的 3 倍標準差內的最小／大值
+    sell_price_min, sell_price_max = filtered_prices_max(sell_prices)
+    buy_price_min, buy_price_max = filtered_prices_max(buy_prices)
+    coingeckoPrices_min, coingeckoPrices_max = filtered_prices_max(coingecko_prices)
+    plt.ylim(min(sell_price_min, buy_price_min, coingeckoPrices_min), max(sell_price_max, buy_price_max, coingeckoPrices_max))
     # 將 X 軸顯示範圍為 sell 或 buy 的 timestamp 顯示範圍
     plt.xlim(min(min(sell_timestamps),min(buy_timestamps)), max(sell_timestamps))
+    # 调整时间标签角度
+    # plt.xticks(rotation=45)
+    plt.xticks(rotation=45, ha='right', rotation_mode='anchor', va='top')
     # 繪圖
     plt.show()
 
@@ -303,7 +400,7 @@ def update_csv(csv_file_path, data):
 
 # 取得 prices 的 n 倍標準差內的最小／大值
 def filtered_prices_max(prices):
-    n = 3
+    n = 2
     # 計算平均值和標準差
     mean = np.mean(prices)
     std = np.std(prices)
@@ -315,3 +412,42 @@ def filtered_prices_max(prices):
     # filtered_prices = df[(df['Price'] >= lower_bound) & (df['Price'] <= upper_bound)]['Price']
     # 取得最大值
     return min(filtered_prices), max(filtered_prices)
+
+# 取得 prices 的 n 倍標準差內的最小／大值
+def over_n_std_to_df(input):
+    data = input[['Timestamp', 'Price']].copy()
+    n = 2
+    # 計算平均值和標準差
+    mean = data['Price'].mean()
+    std = data['Price'].std()
+    # 計算上限和下限
+    upper_bound = mean + n * std
+    lower_bound = mean - n * std
+    # 假設你的 DataFrame 名稱為 df，欄位名稱分別為 Timestamp 和 Price
+    data['Timestamp'] = pd.to_datetime(data['Timestamp'], unit='s')  # 假設 Timestamp 單位為秒，使用 unit='s' 轉換
+    data = data[data['Price'] > upper_bound]
+    data_date = data[['Timestamp']].copy()
+    data_date['Timestamp'] = data_date['Timestamp'].dt.date  # 新增 Date 欄位，只保留日期部份
+    grouped = data_date.groupby('Timestamp').size()  # 將 DataFrame 按照日期分組，並計算每個日期的個數
+    # plt.bar(grouped.index, grouped.values)  # 顯示長條圖
+    # plt.xlabel('Date')
+    # plt.ylabel('Count')
+    # plt.xticks(rotation=45)
+    # plt.show()
+    fig, ax = plt.subplots()
+    ax.bar(grouped.index, grouped.values)  # 顯示長條圖
+
+    # 設定 x 軸標籤的日期格式
+    date_fmt = mdates.DateFormatter('%m/%d')
+    ax.xaxis.set_major_formatter(date_fmt)
+
+    # 設定 x 軸標籤的日期間隔
+    locator = mdates.DayLocator(interval=2)  # 每天一个刻度
+    # locator = mdates.AutoDateLocator()
+    # locator.intervald[1] = 1  # 將預設的日期間隔調整為 1 天
+    ax.xaxis.set_major_locator(locator)
+    plt.xticks(rotation=45, ha='right', rotation_mode='anchor', va='top')
+    plt.xlabel('Date')
+    plt.ylabel('Count')
+    plt.show()
+    return data

@@ -217,6 +217,8 @@ if coin == 'ethereum' and target == 'tether':
     eth_usdt_condition_1 = (subgraph_data_csv["MakerToken"] == "0xdac17f958d2ee523a2206206994597c13d831ec7") & (subgraph_data_csv["TakerToken"] == "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
     eth_usdt_condition_2 = (subgraph_data_csv["MakerToken"] == "0xdac17f958d2ee523a2206206994597c13d831ec7") & (subgraph_data_csv["TakerToken"] == "0x0000000000000000000000000000000000000000")
     sell_eth = subgraph_data_csv[eth_usdt_condition_1 | eth_usdt_condition_2]
+    # 篩出大於 5000 USDT 的大單
+    sell_eth = sell_eth[sell_eth["MakerAmount"].astype(float) > 5000 * 10 ** coin_decimals[target]]
     # 在這個 DF 新增一個 Price 欄位，並且儲存用 MakerAmount / TakerAmount 計算的 Price 值
     sell_eth = sell_eth.assign(Price=(sell_eth["MakerAmount"].astype(float) / 10 ** coin_decimals[target] ) /  ( sell_eth["TakerAmount"].astype(float) / 10 ** coin_decimals[coin] ))
     # 在這個 DF 新增一個 CoingeckoPrice 欄位，用來儲存最靠近的市值
@@ -226,13 +228,17 @@ if coin == 'ethereum' and target == 'tether':
     usdt_eth_condition_1 = (subgraph_data_csv["MakerToken"] == "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2") & (subgraph_data_csv["TakerToken"] == "0xdac17f958d2ee523a2206206994597c13d831ec7")
     usdt_eth_condition_2 = (subgraph_data_csv["MakerToken"] == "0x0000000000000000000000000000000000000000") & (subgraph_data_csv["TakerToken"] == "0xdac17f958d2ee523a2206206994597c13d831ec7")
     buy_eth = subgraph_data_csv[usdt_eth_condition_1 | usdt_eth_condition_2]
+    # 篩出大於 5000 USDT 的大單
+    buy_eth = buy_eth[buy_eth["TakerAmount"].astype(float) > 5000 * 10 ** coin_decimals[target]]
     # 在這個 DF 新增一個 Price 欄位，並且儲存用 TakerAmount / MakerAmount 計算的 Price 值
     buy_eth = buy_eth.assign(Price=(buy_eth["TakerAmount"].astype(float) / 10 ** coin_decimals[target] ) /  ( buy_eth["MakerAmount"].astype(float) / 10 ** coin_decimals[coin] ))
     # 在這個 DF 新增一個 CoingeckoPrice 欄位，用來儲存最靠近的市值
     buy_eth = utils.add_nearest_price_column(eth_data_csv, buy_eth)
+    # utils.over_n_std_to_df(buy_eth).to_csv('./playground/over_n_std_to_df.csv', index=False)
     # 繪製
-    utils.plotMove2(f'{coin}-{target}', eth_data_csv, sell_eth, buy_eth)
+    # utils.plotMove2(f'{coin}-{target}', eth_data_csv, sell_eth, buy_eth)
     # utils.plotMove2(f'{coin}-{target}', uniswap3_subgraph_data_csv, sell_eth, buy_eth)
+    utils.plotMove3(f'{coin}-{target}', eth_data_csv, sell_eth, buy_eth)
 
 # subgraph_data_eth_usdt.to_csv('./test/subgraph_data_eth_usdt.csv', index=False)
 
